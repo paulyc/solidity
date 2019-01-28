@@ -9,6 +9,7 @@ Compiler Features:
  * Optimizer: Add rule for shifts with constants for Constantinople.
  * Optimizer: Combine multiple shifts with constant shift-by values into one.
  * Optimizer: Support shifts in the constant optimiser for Constantinople.
+ * Optimizer: Take shortest representation for store-as-data option in the constant optimizer.
 
 
 Bugfixes:
