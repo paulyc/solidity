@@ -3,6 +3,7 @@
 Language Features:
  * Add support for accessors for mappings with string or byte key types
  * Meta programming: Provide access to the name of contracts via ``type(C).name``.
+ * Allow calldata arrays with dynamically encoded base types with ABIEncoderV2.
 
 
 Compiler Features:

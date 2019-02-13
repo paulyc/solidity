@@ -1554,10 +1554,10 @@ bool ExpressionCompiler::visit(IndexAccess const& _indexAccess)
 		_indexAccess.indexExpression()->accept(*this);
 		utils().convertType(*_indexAccess.indexExpression()->annotation().type, IntegerType::uint256(), true);
 		// stack layout: <base_ref> [<length>] <index>
-		ArrayUtils(m_context).accessIndex(arrayType);
 		switch (arrayType.location())
 		{
 		case DataLocation::Storage:
+			ArrayUtils(m_context).accessIndex(arrayType);
 			if (arrayType.isByteArray())
 			{
 				solAssert(!arrayType.isString(), "Index access to string is not allowed.");
@@ -1567,18 +1567,67 @@ bool ExpressionCompiler::visit(IndexAccess const& _indexAccess)
 				setLValueToStorageItem(_indexAccess);
 			break;
 		case DataLocation::Memory:
+			ArrayUtils(m_context).accessIndex(arrayType);
 			setLValue<MemoryItem>(_indexAccess, *_indexAccess.annotation().type, !arrayType.isByteArray());
 			break;
 		case DataLocation::CallData:
-			//@todo if we implement this, the value in calldata has to be added to the base offset
-			solUnimplementedAssert(!arrayType.baseType()->isDynamicallySized(), "Nested arrays not yet implemented.");
-			if (arrayType.baseType()->isValueType())
-				CompilerUtils(m_context).loadFromMemoryDynamic(
-					*arrayType.baseType(),
-					true,
-					!arrayType.isByteArray(),
-					false
+			if (arrayType.baseType()->isDynamicallySized())
+			{
+				unsigned int baseEncodedSize = arrayType.baseType()->category() == Type::Category::Array ?
+					dynamic_cast<ArrayType const&>(*arrayType.baseType()).calldataStride() :
+					arrayType.baseType()->calldataEncodedSize();
+				solAssert(baseEncodedSize > 0, "");
+
+				// stack layout: <base_ref> <length> <index>
+				ArrayUtils(m_context).accessIndex(arrayType, true, true);
+				// stack layout: <base_ref> <ptr_to_length>
+
+				// returns the absolute offset of the accessed element in "base_ref"
+				// and the length of the accessed element in "ptr_to_length"
+				m_context.appendInlineAssembly(
+					Whiskers(R"({
+					let rel_offset_of_length := calldataload(ptr_to_length)
+					if iszero(slt(rel_offset_of_length, sub(sub(calldatasize(), base_ref), 0x1f))) { revert(0, 0) }
+					let abs_offset_of_length := add(base_ref, rel_offset_of_length)
+					base_ref := add(abs_offset_of_length, 0x20)
+					ptr_to_length := calldataload(abs_offset_of_length)
+					if gt(ptr_to_length, 0xffffffffffffffff) { revert(0, 0) }
+					if gt(add(base_ref, mul(ptr_to_length, <baseEncodedSize>)), calldatasize()) { revert(0, 0) }
+				})")("baseEncodedSize", toCompactHexWithPrefix(baseEncodedSize)).render(),
+					{"base_ref", "ptr_to_length"}
 				);
+				// stack layout: <absolute_offset_of_element> <length_of_element>
+			}
+			else if (arrayType.baseType()->isDynamicallyEncoded())
+			{
+				// stack layout: <base_ref> <length> <index>
+				ArrayUtils(m_context).accessIndex(arrayType, true, true);
+				// stack layout: <base_ref> <ptr_to_tail>
+
+				// returns the absolute offset of the accessed element in "base_ref"
+				m_context.appendInlineAssembly(
+					Whiskers(R"({
+					let rel_offset_of_length := calldataload(ptr_to_length)
+					if iszero(slt(rel_offset_of_length, sub(sub(calldatasize(), base_ref), 0x1f))) { revert(0, 0) }
+					base_ref := add(base_ref, rel_offset_of_length)
+				})").render(),
+					{"base_ref", "ptr_to_length"}
+				);
+				// stack layout: <absolute_offset_of_element> <garbage>
+				m_context << Instruction::POP;
+				// stack layout: <absolute_offset_of_element>
+			}
+			else
+			{
+				ArrayUtils(m_context).accessIndex(arrayType, true);
+				if (arrayType.baseType()->isValueType())
+					CompilerUtils(m_context).loadFromMemoryDynamic(
+						*arrayType.baseType(),
+						true,
+						!arrayType.isByteArray(),
+						false
+					);
+			}
 			break;
 		}
 	}
