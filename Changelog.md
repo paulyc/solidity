@@ -10,7 +10,7 @@ Compiler Features:
  * Inline Assembly: Instructions unavailable to the currently configured EVM are errors now.
  * SMTChecker: Do not report underflow/overflow if they always revert. This removes false positives when using ``SafeMath``.
  * Static Analyzer: Warn about expressions with custom types when they have no effect.
- * Optimizer: Add rule for shifts with constants for Constantinople.
+ * Optimizer: Add rule for shifts with constants (0, >255) for Constantinople.
  * Optimizer: Combine multiple shifts with constant shift-by values into one.
  * Optimizer: Support shifts in the constant optimiser for Constantinople.
  * Yul Optimizer: Add rule to replace switch statements with const expr. with matching case body

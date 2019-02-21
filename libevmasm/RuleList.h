@@ -207,7 +207,7 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart4(
 
 template <class Pattern>
 std::vector<SimplificationRule<Pattern>> simplificationRuleListPart5(
-	Pattern,
+	Pattern A,
 	Pattern,
 	Pattern,
 	Pattern X,
@@ -226,6 +226,28 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart5(
 			false
 		});
 	}
+
+	// Replace SHL >255, X with 0
+	rules.push_back({
+		{Instruction::SHL, {A, X}},
+		[=]() -> Pattern {
+			if (A.d() > 256)
+				return u256(0);
+			return {};
+		},
+		true
+	});
+
+	// Replace SHR >255, X with 0
+	rules.push_back({
+		{Instruction::SHR, {A, X}},
+		[=]() -> Pattern {
+			if (A.d() > 256)
+				return u256(0);
+			return {};
+		},
+		true
+	});
 
 	for (auto const& op: std::vector<Instruction>{
 		Instruction::ADDRESS,
