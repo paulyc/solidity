@@ -92,6 +92,7 @@ public:
 	// Matches a specific constant value.
 	Pattern(u256 const& _value): m_type(Push), m_requireDataMatch(true), m_data(std::make_shared<u256>(_value)) {}
 	// Matches a specific assembly item type or anything if not given.
+	// This can also be used on the output side meaning no replacement took place.
 	Pattern(AssemblyItemType _type = UndefinedItem): m_type(_type) {}
 	// Matches a given instruction with given arguments
 	Pattern(Instruction _instruction, std::vector<Pattern> const& _arguments = {});
