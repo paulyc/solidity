@@ -103,6 +103,32 @@ BOOST_AUTO_TEST_CASE(format_hex_right_align)
 	BOOST_REQUIRE_THROW(test.format(), runtime_error);
 }
 
+BOOST_AUTO_TEST_CASE(format_hex_string_singleline)
+{
+	bytes expectedBytes = fromHex("4200ef");
+	ABIType abiType{ABIType::HexString, ABIType::AlignLeft, 3};
+	Parameter param{expectedBytes, "hex\"4200ef\"", abiType, FormatInfo{}};
+	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
+	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
+	FunctionCall call{"f(string)", 0, arguments, expectations};
+	TestFunctionCall test{call};
+
+	BOOST_REQUIRE_EQUAL(test.format(), "// f(string): hex\"4200ef\" -> hex\"4200ef\"");
+}
+
+BOOST_AUTO_TEST_CASE(format_hex_string_right_align)
+{
+	bytes expectedBytes = fromHex("4200EF");
+	ABIType abiType{ABIType::HexString, ABIType::AlignRight, 3};
+	Parameter param{expectedBytes, "hex\"4200EF\"", abiType, FormatInfo{}};
+	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
+	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
+	FunctionCall call{"f(bytes)", 0, arguments, expectations};
+	TestFunctionCall test{call};
+
+	BOOST_REQUIRE_THROW(test.format(), runtime_error);
+}
+
 BOOST_AUTO_TEST_CASE(format_bool_true_singleline)
 {
 	bytes expectedBytes = toBigEndian(u256{true});

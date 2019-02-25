@@ -310,6 +310,40 @@ BOOST_AUTO_TEST_CASE(call_arguments_bool)
 	);
 }
 
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string_unpadded)
+{
+	char const* source = R"(
+		// f(bytes): hex"4200ef" -> hex"ab0023"
+	)";
+	auto const calls = parse(source);
+	BOOST_REQUIRE_EQUAL(calls.size(), 1);
+	testFunctionCall(
+		calls.at(0),
+		Mode::SingleLine,
+		"f(bytes)",
+		false,
+		fromHex("4200ef"),
+		fromHex("ab0023")
+	);
+}
+
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string_unpadded_lowercase)
+{
+	char const* source = R"(
+		// f(bytes): hex"4200ef" -> hex"23ef00"
+	)";
+	auto const calls = parse(source);
+	BOOST_REQUIRE_EQUAL(calls.size(), 1);
+	testFunctionCall(
+		calls.at(0),
+		Mode::SingleLine,
+		"f(bytes)",
+		false,
+		fromHex("4200EF"),
+		fromHex("23EF00")
+	);
+}
+
 BOOST_AUTO_TEST_CASE(call_arguments_tuple)
 {
 	char const* source = R"(
@@ -599,6 +633,22 @@ BOOST_AUTO_TEST_CASE(call_hex_number_invalid)
 {
 	char const* source = R"(
 		// f(bytes32, bytes32): 0x616, 0x042 -> 1
+	)";
+	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
+}
+
+BOOST_AUTO_TEST_CASE(call_function_name_hex)
+{
+	char const* source = R"(
+		// hex() ->
+	)";
+	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
+}
+
+BOOST_AUTO_TEST_CASE(call_hex_string_invalid)
+{
+	char const* source = R"(
+		// f(bytes32): hex"42E" -> hex"1"
 	)";
 	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
 }

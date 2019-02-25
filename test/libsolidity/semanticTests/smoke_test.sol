@@ -14,6 +14,9 @@ contract C {
     function t(bool b) public returns (bool) {
         return !b;
     }
+    function s() public returns (uint256) {
+        return msg.data.length;
+    }
 }
 // ----
 // f() -> 1
@@ -23,3 +26,5 @@ contract C {
 // i() # Does not exist. # -> FAILURE # Reverts. #
 // x(bytes32): 0x31 -> 0x31
 // t(bool): true -> false
+// s(): hex"4200ef" -> 7
+

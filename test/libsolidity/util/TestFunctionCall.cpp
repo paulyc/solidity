@@ -161,6 +161,10 @@ string TestFunctionCall::formatBytesParameters(bytes const& _bytes, dev::solidit
 			);
 			resultStream << toHex(byteRange, HexPrefix::Add);
 			break;
+		case ABIType::HexString:
+			soltestAssert(param.abiType.align == ABIType::AlignLeft, "Hex strings must be left-aligned.");
+			resultStream << "hex\"" << toHex(byteRange) << "\"";
+			break;
 		case ABIType::Failure:
 			break;
 		case ABIType::None:
