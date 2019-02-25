@@ -96,7 +96,7 @@ The component does not yet support all features of the Solidity language
 and likely outputs many warnings. In case it reports unsupported
 features, the analysis may not be fully sound.
 
-.. index:: source file, ! import
+.. index:: source file, ! import, module
 
 .. _import:
 
@@ -106,8 +106,8 @@ Importing other Source Files
 Syntax and Semantics
 --------------------
 
-Solidity supports import statements that are very similar to those available in JavaScript
-(from ES6 on), although Solidity does not know the concept of a "default export".
+Solidity supports import statements to help modularise your code that are similar to those available in JavaScript
+(from ES6 on). However, Solidity does not support the concept of a "`default export<https://developer.mozilla.org/en-US/docs/web/javascript/reference/statements/export#Description>`_".
 
 At a global level, you can use import statements of the following form:
 
