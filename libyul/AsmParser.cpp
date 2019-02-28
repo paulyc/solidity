@@ -23,6 +23,7 @@
 #include <libyul/AsmParser.h>
 #include <liblangutil/Scanner.h>
 #include <liblangutil/ErrorReporter.h>
+#include <libdevcore/Common.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -104,6 +105,30 @@ Statement Parser::parseStatement()
 	}
 	case Token::For:
 		return parseForLoop();
+	case Token::Break:
+		if (m_insideForLoopBody)
+		{
+			m_scanner->next();
+			return Statement{ createWithLocation<Break>() };
+		}
+		else
+		{
+			m_errorReporter.syntaxError(location(), "Keyword break outside for-loop body is not allowed.");
+			m_scanner->next();
+			return {};
+		}
+	case Token::Continue:
+		if (m_insideForLoopBody)
+		{
+			m_scanner->next();
+			return Statement{ createWithLocation<Continue>() };
+		}
+		else
+		{
+			m_errorReporter.syntaxError(location(), "Keyword continue outside for-loop body is not allowed.");
+			m_scanner->next();
+			return {};
+		}
 	case Token::Assign:
 	{
 		if (m_dialect->flavour != AsmFlavour::Loose)
@@ -249,6 +274,8 @@ ForLoop Parser::parseForLoop()
 	forLoop.pre = parseBlock();
 	forLoop.condition = make_unique<Expression>(parseExpression());
 	forLoop.post = parseBlock();
+	bool outsideForLoopBody = exchange(m_insideForLoopBody, true);
+	auto forLoopBodyGuard = atScopeExit([=]() mutable { m_insideForLoopBody = outsideForLoopBody; });
 	forLoop.body = parseBlock();
 	forLoop.location.end = forLoop.body.location.end;
 	return forLoop;

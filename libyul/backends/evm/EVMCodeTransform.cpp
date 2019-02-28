@@ -68,7 +68,6 @@ void VariableReferenceCounter::operator()(ForLoop const& _forLoop)
 	m_scope = originalScope;
 }
 
-
 void VariableReferenceCounter::operator()(Block const& _block)
 {
 	Scope* originalScope = m_scope;
@@ -90,7 +89,6 @@ void VariableReferenceCounter::increaseRefIfFound(YulString _variableName)
 		[=](Scope::Function const&) { }
 	));
 }
-
 
 CodeTransform::CodeTransform(
 	AbstractAssembly& _assembly,
@@ -616,11 +614,9 @@ void CodeTransform::operator()(ForLoop const& _forLoop)
 
 	visitStatements(_forLoop.pre.statements);
 
-	// TODO: When we implement break and continue, the labels and the stack heights at that point
-	// have to be stored in a stack.
 	AbstractAssembly::LabelID loopStart = m_assembly.newLabelId();
-	AbstractAssembly::LabelID loopEnd = m_assembly.newLabelId();
 	AbstractAssembly::LabelID postPart = m_assembly.newLabelId();
+	AbstractAssembly::LabelID loopEnd = m_assembly.newLabelId();
 
 	m_assembly.setSourceLocation(_forLoop.location);
 	m_assembly.appendLabel(loopStart);
@@ -630,6 +626,8 @@ void CodeTransform::operator()(ForLoop const& _forLoop)
 	m_assembly.appendInstruction(solidity::Instruction::ISZERO);
 	m_assembly.appendJumpToIf(loopEnd);
 
+	int stackBodyHeight = m_assembly.stackHeight();
+	m_context->forLoopStack.emplace(Context::ForLoopLabels{ {postPart, stackBodyHeight}, {loopEnd, stackStartHeight} });
 	(*this)(_forLoop.body);
 
 	m_assembly.setSourceLocation(_forLoop.location);
@@ -642,7 +640,34 @@ void CodeTransform::operator()(ForLoop const& _forLoop)
 	m_assembly.appendLabel(loopEnd);
 
 	finalizeBlock(_forLoop.pre, stackStartHeight);
+	m_context->forLoopStack.pop();
 	m_scope = originalScope;
+}
+
+int CodeTransform::adjustStackTo(int _targetDepth)
+{
+	int const stackDiffAfter = m_assembly.stackHeight() - _targetDepth;
+	for (int i = 0; i < stackDiffAfter; ++i)
+		m_assembly.appendInstruction(solidity::Instruction::POP);
+	return stackDiffAfter;
+}
+
+void CodeTransform::operator()(Break const& _break)
+{
+	yulAssert(!m_context->forLoopStack.empty(), "Invalid break-statement. Requires surrounding for-loop in code generation.");
+	m_assembly.setSourceLocation(_break.location);
+	auto const& labelInfo = m_context->forLoopStack.top().done;
+	m_assembly.appendJumpTo(labelInfo.label, adjustStackTo(labelInfo.stackHeightAdjust));
+	checkStackHeight(&_break);
+}
+
+void CodeTransform::operator()(Continue const& _continue)
+{
+	yulAssert(!m_context->forLoopStack.empty(), "Invalid continue-statement. Requires surrounding for-loop in code generation.");
+	m_assembly.setSourceLocation(_continue.location);
+	auto const& labelInfo = m_context->forLoopStack.top().post;
+	m_assembly.appendJumpTo(labelInfo.label, adjustStackTo(labelInfo.stackHeightAdjust));
+	checkStackHeight(&_continue);
 }
 
 void CodeTransform::operator()(Block const& _block)

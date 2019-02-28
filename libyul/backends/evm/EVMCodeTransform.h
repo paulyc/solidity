@@ -30,6 +30,8 @@
 #include <boost/variant.hpp>
 #include <boost/optional.hpp>
 
+#include <stack>
+
 namespace langutil
 {
 class ErrorReporter;
@@ -57,6 +59,20 @@ struct CodeTransformContext
 	std::map<Scope::Function const*, AbstractAssembly::LabelID> functionEntryIDs;
 	std::map<Scope::Variable const*, int> variableStackHeights;
 	std::map<Scope::Variable const*, unsigned> variableReferences;
+
+	struct JumpInfo
+	{
+		AbstractAssembly::LabelID label;  ///< Jump's LabelID to jump to.
+		int stackHeightAdjust;            ///< Stack height to restore to.
+	};
+
+	struct ForLoopLabels
+	{
+		JumpInfo post; ///< Jump info for jumping to post branch.
+		JumpInfo done; ///< Jump info for jumping to done branch.
+	};
+
+	std::stack<ForLoopLabels> forLoopStack;
 };
 
 /**
@@ -142,6 +158,11 @@ protected:
 		std::shared_ptr<Context> _context
 	);
 
+	/// Adjusts the stack by adding POP instructions to the output assembly until the @p _targetDepth is satisfied.
+	/// @param _targetDepth original stack height to restore the stack to.
+	/// @returns the stack height difference those POP instructions have caused.
+	int adjustStackTo(int _targetDepth);
+
 	void decreaseReference(YulString _name, Scope::Variable const& _var);
 	bool unreferenced(Scope::Variable const& _var) const;
 	/// Marks slots of variables that are not used anymore
@@ -166,6 +187,8 @@ public:
 	void operator()(Switch const& _switch);
 	void operator()(FunctionDefinition const&);
 	void operator()(ForLoop const&);
+	void operator()(Break const&);
+	void operator()(Continue const&);
 	void operator()(Block const& _block);
 
 private:
