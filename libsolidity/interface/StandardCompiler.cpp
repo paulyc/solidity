@@ -22,8 +22,8 @@
 
 #include <libsolidity/interface/StandardCompiler.h>
 
-#include <libsolidity/interface/AssemblyStack.h>
 #include <libsolidity/ast/ASTJsonConverter.h>
+#include <libyul/AssemblyStack.h>
 #include <liblangutil/SourceReferenceFormatter.h>
 #include <libevmasm/Instruction.h>
 #include <libdevcore/JSON.h>
@@ -38,6 +38,7 @@ using namespace std;
 using namespace dev;
 using namespace langutil;
 using namespace dev::solidity;
+using namespace yul;
 
 namespace {
 
@@ -380,7 +381,7 @@ Json::Value compileYul(Json::Value const& _input)
 	if (!stack.parseAndAnalyze("", _input["source"].asString()))
 	{
 		Json::Value errors = Json::arrayValue;
-		auto scannerFromSourceName = [&](string const&) -> solidity::Scanner const& { return stack.scanner(); };
+//		auto scannerFromSourceName = [&](string const&) -> langutil::Scanner const& { return stack.scanner(); };
 		for (auto const& error: stack.errors())
 		{
 			auto err = dynamic_pointer_cast<Error const>(error);
@@ -390,8 +391,8 @@ Json::Value compileYul(Json::Value const& _input)
 				err->type() == Error::Type::Warning,
 				err->typeName(),
 				"general",
-				"",
-				scannerFromSourceName
+				""
+///				scannerFromSourceName
 			));
 		}
 		output["errors"] = errors;
@@ -477,11 +478,11 @@ Json::Value StandardCompiler::compileInternal(Json::Value const& _input)
 	if (!_input.isObject())
 		return formatFatalError("JSONError", "Input is not a JSON object.");
 
-	if (auto result = checkRootKeys(_input))
-		return *result;
-
 	if (_input["language"] == "Yul")
 		return compileYul(_input);
+
+	if (auto result = checkRootKeys(_input))
+		return *result;
 
 	if (_input["language"] != "Solidity")
 		return formatFatalError("JSONError", "Only \"Solidity\" or \"Yul\" is supported as a language.");
