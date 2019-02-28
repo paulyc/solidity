@@ -102,6 +102,30 @@ inline std::ostream& operator<<(std::ostream& os, bytes const& _bytes)
 	return os;
 }
 
+/// Increments @p incrementable and ensures it is getting decremented upon destruction of the returned value.
+///
+/// Use this to ensure scoped increments/decrements in your code.
+template <typename Incrementable>
+auto inline scopedIncrement(Incrementable& incrementable)
+{
+	struct ScopedIncrement {
+		Incrementable& value;
+		~ScopedIncrement() { --value; }
+	};
+	return ScopedIncrement{ ++incrementable };
+}
+
+/// A more generic ScopeGuard to ensure @p callable is being invoked at scope exit.
+template <typename Callable>
+auto inline atScopeExit(Callable callable)
+{
+	struct ExitCode {
+		Callable leave;
+		~ExitCode() { leave(); }
+	};
+	return ExitCode{ std::move(callable) };
+}
+
 /// RAII utility class whose destructor calls a given function.
 class ScopeGuard
 {
