@@ -334,7 +334,9 @@ The following functions must be available:
 +---------------------------------------------------------------------------------------------------------------+
 | *Logic*                                                                                                       |
 +---------------------------------------------+-----------------------------------------------------------------+
-| not(x:bool) -> z:bool                       | logical not                                                     |
+| .. code::                                   |                                                                 |
+|                                             |                                                                 |
+|    not(x:bool) -> z:bool                    | logical not                                                     |
 +---------------------------------------------+-----------------------------------------------------------------+
 | and(x:bool, y:bool) -> z:bool               | logical and                                                     |
 +---------------------------------------------+-----------------------------------------------------------------+
@@ -364,7 +366,10 @@ The following functions must be available:
 +---------------------------------------------+-----------------------------------------------------------------+
 | addmodu256(x:u256, y:u256, m:u256) -> z:u256| (x + y) % m with arbitrary precision arithmetic                 |
 +---------------------------------------------+-----------------------------------------------------------------+
-| mulmodu256(x:u256, y:u256, m:u256) -> z:u256| (x * y) % m with arbitrary precision arithmetic                 |
+| .. code::                                   |                                                                 |
+|                                             |                                                                 |
+|    mulmodu256(x:u256, y:u256, m:u256)       |                                                                 |
+|    -> z:u256                                | (x * y) % m with arbitrary precision arithmetic                 |
 +---------------------------------------------+-----------------------------------------------------------------+
 | ltu256(x:u256, y:u256) -> z:bool            | true if x < y, false otherwise                                  |
 +---------------------------------------------+-----------------------------------------------------------------+
@@ -425,10 +430,12 @@ The following functions must be available:
 |                                             | 8 byte value, ``this`` is the current contract's address        |
 |                                             | as a 20 byte value and ``s`` is a big-endian 256-bit value      |
 +---------------------------------------------+-----------------------------------------------------------------+
-| call(g:u256, a:u256, v:u256, in:u256,       | call contract at address a with input mem[in..(in+insize))      |
-| insize:u256, out:u256,                      | providing g gas and v wei and output area                       |
-| outsize:u256)                               | mem[out..(out+outsize)) returning 0 on error (eg. out of gas)   |
-| -> r:u256                                   | and 1 on success                                                |
+| .. code::                                   |                                                                 |
+|                                             |                                                                 |
+|    call(g:u256, a:u256, v:u256, in:u256,    | call contract at address a with input mem[in..(in+insize))      |
+|    insize:u256, out:u256,                   | providing g gas and v wei and output area                       |
+|    outsize:u256)                            | mem[out..(out+outsize)) returning 0 on error (eg. out of gas)   |
+|    -> r:u256                                | and 1 on success                                                |
 +---------------------------------------------+-----------------------------------------------------------------+
 | callcode(g:u256, a:u256, v:u256, in:u256,   | identical to ``call`` but only use the code from a              |
 | insize:u256, out:u256,                      | and stay in the context of the                                  |
