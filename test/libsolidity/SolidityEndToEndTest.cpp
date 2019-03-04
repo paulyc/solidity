@@ -8309,6 +8309,738 @@ BOOST_AUTO_TEST_CASE(calldata_struct_function_type)
 	ABI_CHECK(callContractFunctionNoEncoding("f((function))", fn_C_h), encodeArgs(23));
 }
 
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f1(uint[][1] calldata a) external returns (uint256, uint256, uint256, uint256) {
+				return (a[0].length, a[0][0], a[0][1], a[0][2]);
+			}
+			function f2(uint[][1] calldata a, uint[][1] calldata b) external returns (uint256, uint256, uint256, uint256, uint256, uint256, uint256) {
+				return (a[0].length, a[0][0], a[0][1], a[0][2], b[0].length, b[0][0], b[0][1]);
+			}
+			function g1(uint[3][2] calldata a) external returns (uint256, uint256, uint256, uint256, uint256, uint256) {
+				return (a[0][0], a[0][1], a[0][2], a[1][0], a[1][1], a[1][2]);
+			}
+			function g2(uint[][2] calldata a) external returns (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256) {
+				return (a[0].length, a[0][0], a[0][1], a[0][2], a[1].length, a[1][0], a[1][1], a[1][2]);
+			}
+			function g3(uint[][] calldata a) external returns (uint256[8] memory) {
+				return [a.length, a[0].length, a[0][0], a[0][1], a[1].length, a[1][0], a[1][1], a[1][2]];
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+	ABI_CHECK(
+	    callContractFunction("f1(uint256[][1])", 0x20, 0x20, 3, 1, 2, 3),
+	    encodeArgs(3, 1, 2, 3)
+	);
+	ABI_CHECK(
+	    callContractFunction("f2(uint256[][1],uint256[][1])", 0x40, 0xE0, 0x20, 3, 1, 2, 3, 0x20, 2, 1, 2),
+	    encodeArgs(3, 1, 2, 3, 2, 1, 2)
+	);
+	ABI_CHECK(
+	    callContractFunction("g1(uint256[3][2])", 1, 2, 3, 4, 5, 6),
+	    encodeArgs(1, 2, 3, 4, 5, 6)
+	);
+	ABI_CHECK(
+	    callContractFunction("g2(uint256[][2])", 0x20, 0x40, 0xC0, 3, 1, 2, 3, 3, 4, 5, 6),
+	    encodeArgs(3, 1, 2, 3, 3, 4, 5, 6)
+	);
+	// same offset for both arrays
+	ABI_CHECK(
+	    callContractFunction("g2(uint256[][2])", 0x20, 0x40, 0x40, 3, 1, 2, 3),
+	    encodeArgs(3, 1, 2, 3, 3, 1, 2, 3)
+	);
+	// overlapping arrays (re-/abuse value 3 as length of second array)
+	ABI_CHECK(
+	    callContractFunction("g2(uint256[][2])", 0x20, 0x40, 0xA0, 3, 1, 2, 3, 4, 5, 6),
+	    encodeArgs(3, 1, 2, 3, 3, 4, 5, 6)
+	);
+	ABI_CHECK(
+	    callContractFunction("g3(uint256[][])", 0x20, 2, 0x40, 0xA0, 2, 1, 2, 3, 3, 4, 5),
+	    encodeArgs(2, 2, 1, 2, 3, 3, 4, 5)
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic_bytes)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f1(bytes[1] calldata a) external returns (uint256, uint256, uint256, uint256) {
+				return (a[0].length, uint8(a[0][0]), uint8(a[0][1]), uint8(a[0][2]));
+			}
+			function f2(bytes[1] calldata a, bytes[1] calldata b) external returns (uint256, uint256, uint256, uint256, uint256, uint256, uint256) {
+				return (a[0].length, uint8(a[0][0]), uint8(a[0][1]), uint8(a[0][2]), b[0].length, uint8(b[0][0]), uint8(b[0][1]));
+			}
+			function g1(bytes[2] calldata a) external returns (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256) {
+				return (a[0].length, uint8(a[0][0]), uint8(a[0][1]), uint8(a[0][2]), a[1].length, uint8(a[1][0]), uint8(a[1][1]), uint8(a[1][2]));
+			}
+			function g2(bytes[] calldata a) external returns (uint256[8] memory) {
+				return [a.length, a[0].length, uint8(a[0][0]), uint8(a[0][1]), a[1].length, uint8(a[1][0]), uint8(a[1][1]), uint8(a[1][2])];
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    bytes bytes010203 = bytes{1,2,3}+bytes(29,0);
+    bytes bytes040506 = bytes{4,5,6}+bytes(29,0);
+    bytes bytes0102 = bytes{0x01,02}+bytes(30,0);
+	ABI_CHECK(
+	    callContractFunction("f1(bytes[1])", 0x20, 0x20, 3, bytes010203),
+	    encodeArgs(3, 1, 2, 3)
+	);
+	ABI_CHECK(
+	    callContractFunction("f2(bytes[1],bytes[1])", 0x40, 0xA0, 0x20, 3, bytes010203, 0x20, 2, bytes0102),
+	    encodeArgs(3, 1, 2, 3, 2, 1, 2)
+	);
+	ABI_CHECK(
+	    callContractFunction("g1(bytes[2])", 0x20, 0x40, 0x80, 3, bytes010203, 3, bytes040506),
+	    encodeArgs(3, 1, 2, 3, 3, 4, 5, 6)
+	);
+	// same offset for both arrays
+	ABI_CHECK(
+	    callContractFunction("g1(bytes[2])", 0x20, 0x40, 0x40, 3, bytes010203),
+	    encodeArgs(3, 1, 2, 3, 3, 1, 2, 3)
+	);
+	ABI_CHECK(
+	    callContractFunction("g2(bytes[])", 0x20, 2, 0x40, 0x80, 2, bytes0102, 3, bytes040506),
+	    encodeArgs(2, 2, 1, 2, 3, 4, 5, 6)
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic_bounds)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][1] calldata a, uint256 offset) external returns (uint256) {
+				return a[0][offset];
+			}
+			function g(uint256[][1] calldata a) external returns (uint256) {
+				return 42;
+			}
+			function h(uint256[][1] calldata a) external returns (uint256) {
+				a[0];
+				return 23;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid accesses
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1],uint256)", 0x40, 0, 0x20, 3, 1, 2, 3),
+	    encodeArgs(1)
+	);
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1],uint256)", 0x40, 1, 0x20, 3, 1, 2, 3),
+	    encodeArgs(2)
+	);
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1],uint256)", 0x40, 2, 0x20, 3, 1, 2, 3),
+	    encodeArgs(3)
+	);
+	// out of bounds access
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1],uint256)", 0x40, 3, 0x20, 3, 1, 2, 3),
+	    encodeArgs()
+	);
+	// out of bounds array size, but no access
+    ABI_CHECK(
+        callContractFunction("g(uint256[][1])", 0x20, 0x20, 4, 1, 2, 3),
+        encodeArgs(42)
+    );
+	// out of bounds array size
+    ABI_CHECK(
+        callContractFunction("h(uint256[][1])", 0x20, 0x20, 4, 1, 2, 3),
+        encodeArgs()
+    );
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic_invalid_encoding)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][1] calldata a) external returns (uint256) {
+				return 42;
+			}
+			function g(uint256[][1] calldata a) external returns (uint256) {
+			    a[0];
+				return 23;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid encoding
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1])", 0x20, 0x20, 3, 1, 2, 3),
+	    encodeArgs(42)
+	);
+    // valid encoding empty
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1])", 0x20, 0x20, 0),
+	    encodeArgs(42)
+	);
+    // short calldata outer array tail pointer
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1])", 0x20),
+	    encodeArgs()
+	);
+    // short calldata inner array tail pointer, but no access
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1])", 0x20, 0x20),
+	    encodeArgs(42)
+	);
+    // short calldata inner array tail size, but no access
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1])", 0x20, 0x20, 1),
+	    encodeArgs(42)
+	);
+    // short calldata inner array tail pointer, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1])", 0x20, 0x20),
+	    encodeArgs()
+	);
+    // short calldata inner array tail size, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_multi_dynamic_invalid_encoding)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][] calldata a) external returns (uint256) {
+				return 42;
+			}
+			function g(uint256[][] calldata a) external returns (uint256) {
+			    a[0];
+				return 23;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid encoding empty
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][])", 0x20, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding, inner empty
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][])", 0x20, 2, 0x40, 0x60, 0, 0),
+	    encodeArgs(42)
+	);
+    // short calldata outer array tail pointer
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][])", 0x20),
+	    encodeArgs()
+	);
+    // short calldata inner array tail pointer, no access
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][])", 0x20, 1, 0x20),
+	    encodeArgs(42)
+	);
+    // short calldata inner array tail pointer, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][])", 0x20, 1, 0x20),
+	    encodeArgs()
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_static_dynamic_static)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[1][][1] calldata a) external returns (uint256) {
+				return 42;
+			}
+			function g(uint256[1][][1] calldata a) external returns (uint256) {
+			    a[0];
+				return 42;
+			}
+			function h(uint256[1][][1] calldata a) external returns (uint256) {
+			    a[0][0];
+				return 42;
+			}
+			function i(uint256[1][][1] calldata a) external returns (uint256) {
+				return a[0][0][0];
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid encoding empty
+	ABI_CHECK(
+	    callContractFunction("f(uint256[1][][1])", 0x20, 0x20, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding empty outer access
+	ABI_CHECK(
+	    callContractFunction("g(uint256[1][][1])", 0x20, 0x20, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding empty middle access
+	ABI_CHECK(
+	    callContractFunction("h(uint256[1][][1])", 0x20, 0x20, 0),
+	    encodeArgs()
+	);
+
+    // valid encoding middle size 1
+	ABI_CHECK(
+	    callContractFunction("f(uint256[1][][1])", 0x20, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+    // valid encoding middle size 1, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[1][][1])", 0x20, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[1][][1])", 0x20, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[1][][1])", 0x20, 0x20, 1, 23),
+	    encodeArgs(23)
+	);
+    // valid encoding middle size 1, short
+	ABI_CHECK(
+	    callContractFunction("f(uint256[1][][1])", 0x20, 0x20, 1),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[1][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[1][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[1][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_static_dynamic_dynamic)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][][1] calldata a) external returns (uint256) {
+				return 42;
+			}
+			function g(uint256[][][1] calldata a) external returns (uint256) {
+			    a[0];
+				return 42;
+			}
+			function h(uint256[][][1] calldata a) external returns (uint256) {
+			    a[0][0];
+				return 42;
+			}
+			function i(uint256[][][1] calldata a) external returns (uint256) {
+				return a[0][0][0];
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid encoding empty
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][][1])", 0x20, 0x20, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding empty outer access
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][][1])", 0x20, 0x20, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding empty middle access
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][][1])", 0x20, 0x20, 0),
+	    encodeArgs()
+	);
+
+    // valid encoding middle size 1
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+    // valid encoding middle size 1, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1, 23),
+	    encodeArgs(23)
+	);
+
+    // valid encoding middle size 1, inner short
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1),
+	    encodeArgs(42)
+	);
+    // valid encoding middle size 1, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][][1])", 0x20, 0x20, 1, 0x20, 1),
+	    encodeArgs()
+	);
+
+    // valid encoding middle size 1, inner short
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][][1])", 0x20, 0x20, 1, 0x40, 0),
+	    encodeArgs(42)
+	);
+    // valid encoding middle size 1, accessed
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][][1])", 0x20, 0x20, 1, 0x40, 0),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][][1])", 0x20, 0x20, 1, 0x40, 0),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][][1])", 0x20, 0x20, 1, 0x40, 0),
+	    encodeArgs()
+	);
+
+    // valid encoding middle size 1, short
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][][1])", 0x20, 0x20, 1),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][][1])", 0x20, 0x20, 1),
+	    encodeArgs()
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_another_test)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+		    function encode() external returns (bytes memory) {
+		        uint256[][1][] memory a = new uint256[][1][](1);
+		        a[0][0] = new uint256[](1);
+		        a[0][0][0] = 23;
+		        return abi.encode(a);
+		    }
+			function f(uint256[][1][] calldata a) external returns (uint) {
+			    return a[0][0][0];
+			}
+			function g(uint256[][1][] calldata a) external returns (uint) {
+			    return a[0][0].length;
+			}
+			function h(uint256[][1][] calldata a) external returns (uint) {
+			    return a[0].length;
+			}
+			function i(uint256[][1][] calldata a) external returns (uint) {
+			    return a.length;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // verify used reference encoding
+	ABI_CHECK(
+	    callContractFunction("encode()"),
+	    encodeArgs(0x20, 0xc0, 0x20, 1, 0x20, 0x20, 1, 23)
+	);
+    // valid accesses
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1][])", 0x20, 1, 0x20, 0x20, 1, 23),
+	    encodeArgs(23)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1][])", 0x20, 1, 0x20, 0x20, 1, 23),
+	    encodeArgs(1)
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][1][])", 0x20, 1, 0x20, 0x20, 1, 23),
+	    encodeArgs(1)
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][1][])", 0x20, 1, 0x20, 0x20, 1, 23),
+	    encodeArgs(1)
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic_static_dynamic)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][1][] calldata a) external returns (uint) {
+			    return 42;
+			}
+			function g(uint256[][1][] calldata a) external returns (uint) {
+			    return a[0][0][0];
+			}
+			function h(uint256[][1][] calldata a) external returns (uint) {
+			    a[0][0];
+			    return 42;
+			}
+			function i(uint256[][1][] calldata a) external returns (uint) {
+			    a[0];
+			    return 42;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+    // valid accesses
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1][])", 0x20, 1, 0x20, 0x20, 1, 0x20, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1][])", 0x20, 1, 0x40, 0x20, 1, 23),
+	    encodeArgs()
+	);
+    // invalid tail ptr 1
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1][])", 0x20, 1, 0xFF0, 0x20, 1, 0x20, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1][])", 0x20, 1, 0xFF0, 0x20, 1, 23),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][1][])", 0x20, 1, 0xFF0, 0x20, 1, 23),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][1][])", 0x20, 1, 0xFF0, 0x20, 1, 23),
+	    encodeArgs()
+	);
+    // invalid tail ptr 2
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][1][])", 0x20, 1, 0x20, 0xF00, 1, 0x20, 23),
+	    encodeArgs(42)
+	);
+	ABI_CHECK(
+	    callContractFunction("g(uint256[][1][])", 0x20, 1, 0x20, 0xF00, 1, 0x20, 23),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("h(uint256[][1][])", 0x20, 1, 0x20, 0xF00, 1, 0x20, 23),
+	    encodeArgs()
+	);
+	ABI_CHECK(
+	    callContractFunction("i(uint256[][1][])", 0x20, 1, 0x20, 0xF00, 1, 0x20, 23),
+	    encodeArgs(42)
+	);
+}
+
+
+BOOST_AUTO_TEST_CASE(calldata_dynamic_array_to_memory)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(uint256[][] calldata a) external returns (uint, uint256[] memory) {
+			    uint256[] memory m = a[0];
+			    return (a.length, m);
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+	ABI_CHECK(
+	    callContractFunction("f(uint256[][])", 0x20, 1, 0x20, 2, 23, 42),
+	    encodeArgs(1, 0x40, 2, 23, 42)
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_bytes_array_to_memory)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(bytes[] calldata a) external returns (uint, uint, bytes memory) {
+			    bytes memory m = a[0];
+			    return (a.length, m.length, m);
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+	ABI_CHECK(
+	    callContractFunction("f(bytes[])", 0x20, 1, 0x20, 2, bytes{'a', 'b'} + bytes(30, 0)),
+	    encodeArgs(1, 2, 0x60, 2, bytes{'a','b'} + bytes(30, 0))
+	);
+
+	ABI_CHECK(
+	    callContractFunction("f(bytes[])", 0x20, 1, 0x20, 32, bytes(32, 'x')),
+	    encodeArgs(1, 32, 0x60, 32, bytes(32, 'x'))
+	);
+	bytes x_zero_a = bytes{'x'} + bytes(30, 0) + bytes{'a'};
+	bytes a_zero_x = bytes{'a'} + bytes(30, 0) + bytes{'x'};
+	bytes a_m_x = bytes{'a'} + bytes(30, 'm') + bytes{'x'};
+	ABI_CHECK(
+	    callContractFunction("f(bytes[])", 0x20, 1, 0x20, 32, x_zero_a),
+	    encodeArgs(1, 32, 0x60, 32, x_zero_a)
+	);
+	ABI_CHECK(
+	    callContractFunction("f(bytes[])", 0x20, 1, 0x20, 32, a_zero_x),
+	    encodeArgs(1, 32, 0x60, 32, a_zero_x)
+	);
+	ABI_CHECK(
+	    callContractFunction("f(bytes[])", 0x20, 1, 0x20, 32, a_m_x),
+	    encodeArgs(1, 32, 0x60, 32, a_m_x)
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_string_array)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function f(string[] calldata a) external returns (uint, uint, uint, string memory) {
+			    string memory s1 = a[0];
+			    bytes memory m1 = bytes(s1);
+				return (a.length, m1.length, uint8(m1[0]), s1);
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+	ABI_CHECK(
+	    callContractFunction("f(string[])", 0x20, 1, 0x20, 2, bytes{'a', 'b'} + bytes(30, 0)),
+	    encodeArgs(1, 2, 'a', 0x80, 2, bytes{'a', 'b'} + bytes(30, 0))
+	);
+}
+
+BOOST_AUTO_TEST_CASE(calldata_array_dynamic_dynamic_generated)
+{
+	char const* sourceCode = R"(
+		pragma experimental ABIEncoderV2;
+		contract C {
+			function abiEncode(uint256[] memory sizes) public returns (bytes memory) {
+			    uint256[][] memory array = new uint256[][](sizes.length);
+			    for(uint256 i = 0; i < sizes.length; i++) {
+			        array[i] = new uint256[](sizes[i]);
+			        for(uint256 j = 0; j < sizes[i]; j++) {
+			            array[i][j] = (0x42 << 64) | (i << 32) | j;
+			        }
+			    }
+			    return abi.encode(array);
+			}
+			function testNoAccess(uint256[][] calldata) external returns (uint256) {
+			    return 42;
+			}
+			function testAccessOuter(uint256[][] calldata a, uint256 i) external returns (uint256) {
+			    return a[i].length;
+			}
+			function testAccess(uint256[][] calldata a, uint256 i, uint256 j) external returns (uint256) {
+			    return a[i][j];
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+
+	auto generateValue = [](u256 i, u256 j) -> u256 {
+	    return (u256(0x42) << 64) | (i << 32) | j;
+	};
+
+    for(vector<u256> const& sizeVector: {
+        vector<u256> { 1, 1 },
+        vector<u256> { 2, 4, 3 },
+        vector<u256> { 7, 0, 0, 3, 1 }
+    })
+	{
+	    auto generateEncoding = [&](vector<u256> const& sizes) {
+	        bytes encodedBytes;
+	        encodedBytes += encode(sizes.size());
+	        vector<bytes> subEncodings;
+	        for (size_t i = 0; i < sizes.size(); i++) {
+	            subEncodings.emplace_back();
+	            subEncodings.back() += encode(sizes[i]);
+	            for (size_t j = 0; j < sizes[i]; j++) {
+	                subEncodings.back() += encode(generateValue(i, j));
+	            }
+	        }
+	        u256 offset = u256(subEncodings.size() * 0x20);
+	        for (size_t i = 0; i < sizes.size(); i++) {
+	            encodedBytes += encode(offset);
+	            offset += subEncodings[i].size();
+	        }
+	        for (size_t i = 0; i < sizes.size(); i++) {
+	            encodedBytes += subEncodings[i];
+	        }
+	        return encodedBytes;
+	    };
+
+        bytes arrayEncoding = generateEncoding(sizeVector);
+        ABI_CHECK(
+            callContractFunction("abiEncode(uint256[])", encodeDyn(sizeVector)),
+            encodeDyn(encode(0x20) + arrayEncoding)
+        );
+
+        ABI_CHECK(
+            callContractFunction("testNoAccess(uint256[][])", 0x20, arrayEncoding),
+            encodeArgs(42)
+        );
+        for (size_t i = 0; i < sizeVector.size(); i++) {
+            ABI_CHECK(
+                callContractFunction("testAccessOuter(uint256[][],uint256)", 0x40, i, arrayEncoding),
+                encodeArgs(sizeVector[i])
+            );
+            for (size_t j = 0; j < sizeVector[i]; j++) {
+                ABI_CHECK(
+                    callContractFunction("testAccess(uint256[][],uint256,uint256)", 0x60, i, j, arrayEncoding),
+                    encodeArgs(generateValue(i, j))
+                );
+            }
+            // out of bounds inner
+            ABI_CHECK(
+                callContractFunction("testAccess(uint256[][],uint256,uint256)", 0x60, i, sizeVector[i], arrayEncoding),
+                encodeArgs()
+            );
+        }
+        // out of bounds outer
+        ABI_CHECK(
+            callContractFunction("testAccessOuter(uint256[][],uint256)", 0x40, sizeVector.size(), arrayEncoding),
+            encodeArgs()
+        );
+	}
+}
+
 BOOST_AUTO_TEST_CASE(literal_strings)
 {
 	char const* sourceCode = R"(
