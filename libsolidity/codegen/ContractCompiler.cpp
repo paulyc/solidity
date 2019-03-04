@@ -65,7 +65,7 @@ void ContractCompiler::compileContract(
 	map<ContractDefinition const*, shared_ptr<Compiler const>> const& _otherCompilers
 )
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _contract);
+	auto locationSetter = m_context.scopedLocation(_contract);
 
 	if (_contract.isLibrary())
 		// Check whether this is a call (true) or a delegatecall (false).
@@ -86,7 +86,7 @@ size_t ContractCompiler::compileConstructor(
 	std::map<ContractDefinition const*, shared_ptr<Compiler const>> const& _otherCompilers
 )
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _contract);
+	auto locationSetter = m_context.scopedLocation(_contract);
 	if (_contract.isLibrary())
 		return deployLibrary(_contract);
 	else
@@ -120,7 +120,7 @@ void ContractCompiler::appendCallValueCheck()
 void ContractCompiler::appendInitAndConstructorCode(ContractDefinition const& _contract)
 {
 	solAssert(!_contract.isLibrary(), "Tried to initialize library.");
-	CompilerContext::LocationSetter locationSetter(m_context, _contract);
+	auto locationSetter = m_context.scopedLocation(_contract);
 
 	m_baseArguments = &_contract.annotation().baseConstructorArguments;
 
@@ -154,7 +154,7 @@ size_t ContractCompiler::packIntoContractCreator(ContractDefinition const& _cont
 	appendMissingFunctions();
 	m_runtimeCompiler->appendMissingFunctions();
 
-	CompilerContext::LocationSetter locationSetter(m_context, _contract);
+	auto locationSetter = m_context.scopedLocation(_contract);
 	m_context << deployRoutine;
 
 	solAssert(m_context.runtimeSub() != size_t(-1), "Runtime sub not registered");
@@ -172,7 +172,7 @@ size_t ContractCompiler::deployLibrary(ContractDefinition const& _contract)
 	solAssert(!!m_runtimeCompiler, "");
 	solAssert(_contract.isLibrary(), "Tried to deploy contract as library.");
 
-	CompilerContext::LocationSetter locationSetter(m_context, _contract);
+	auto locationSetter = m_context.scopedLocation(_contract);
 
 	solAssert(m_context.runtimeSub() != size_t(-1), "Runtime sub not registered");
 	m_context.pushSubroutineSize(m_context.runtimeSub());
@@ -197,7 +197,7 @@ size_t ContractCompiler::deployLibrary(ContractDefinition const& _contract)
 
 void ContractCompiler::appendBaseConstructor(FunctionDefinition const& _constructor)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _constructor);
+	auto locationSetter = m_context.scopedLocation(_constructor);
 	FunctionType constructorType(_constructor);
 	if (!constructorType.parameterTypes().empty())
 	{
@@ -219,7 +219,7 @@ void ContractCompiler::appendBaseConstructor(FunctionDefinition const& _construc
 
 void ContractCompiler::appendConstructor(FunctionDefinition const& _constructor)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _constructor);
+	auto locationSetter = m_context.scopedLocation(_constructor);
 	if (!_constructor.isPayable())
 		appendCallValueCheck();
 
@@ -416,7 +416,7 @@ void ContractCompiler::appendFunctionSelector(ContractDefinition const& _contrac
 	{
 		FunctionTypePointer const& functionType = it.second;
 		solAssert(functionType->hasDeclaration(), "");
-		CompilerContext::LocationSetter locationSetter(m_context, functionType->declaration());
+		auto locationSetter = m_context.scopedLocation(functionType->declaration());
 
 		m_context << callDataUnpackerEntryPoints.at(it.first);
 		if (_contract.isLibrary() && functionType->stateMutability() > StateMutability::View)
@@ -490,7 +490,7 @@ void ContractCompiler::initializeStateVariables(ContractDefinition const& _contr
 bool ContractCompiler::visit(VariableDeclaration const& _variableDeclaration)
 {
 	solAssert(_variableDeclaration.isStateVariable(), "Compiler visit to non-state variable declaration.");
-	CompilerContext::LocationSetter locationSetter(m_context, _variableDeclaration);
+	auto locationSetter = m_context.scopedLocation(_variableDeclaration);
 
 	m_context.startFunction(_variableDeclaration);
 	m_breakTags.clear();
@@ -506,7 +506,7 @@ bool ContractCompiler::visit(VariableDeclaration const& _variableDeclaration)
 
 bool ContractCompiler::visit(FunctionDefinition const& _function)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _function);
+	auto locationSetter = m_context.scopedLocation(_function);
 
 	m_context.startFunction(_function);
 
@@ -729,7 +729,7 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 bool ContractCompiler::visit(IfStatement const& _ifStatement)
 {
 	StackHeightChecker checker(m_context);
-	CompilerContext::LocationSetter locationSetter(m_context, _ifStatement);
+	auto locationSetter = m_context.scopedLocation(_ifStatement);
 	compileExpression(_ifStatement.condition());
 	m_context << Instruction::ISZERO;
 	eth::AssemblyItem falseTag = m_context.appendConditionalJump();
@@ -750,7 +750,7 @@ bool ContractCompiler::visit(IfStatement const& _ifStatement)
 bool ContractCompiler::visit(WhileStatement const& _whileStatement)
 {
 	StackHeightChecker checker(m_context);
-	CompilerContext::LocationSetter locationSetter(m_context, _whileStatement);
+	auto locationSetter = m_context.scopedLocation(_whileStatement);
 
 	eth::AssemblyItem loopStart = m_context.newTag();
 	eth::AssemblyItem loopEnd = m_context.newTag();
@@ -793,7 +793,7 @@ bool ContractCompiler::visit(WhileStatement const& _whileStatement)
 bool ContractCompiler::visit(ForStatement const& _forStatement)
 {
 	StackHeightChecker checker(m_context);
-	CompilerContext::LocationSetter locationSetter(m_context, _forStatement);
+	auto locationSetter = m_context.scopedLocation(_forStatement);
 	eth::AssemblyItem loopStart = m_context.newTag();
 	eth::AssemblyItem loopEnd = m_context.newTag();
 	eth::AssemblyItem loopNext = m_context.newTag();
@@ -840,7 +840,7 @@ bool ContractCompiler::visit(ForStatement const& _forStatement)
 
 bool ContractCompiler::visit(Continue const& _continueStatement)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _continueStatement);
+	auto locationSetter = m_context.scopedLocation(_continueStatement);
 	solAssert(!m_continueTags.empty(), "");
 	CompilerUtils(m_context).popAndJump(m_continueTags.back().second, m_continueTags.back().first);
 	return false;
@@ -848,7 +848,7 @@ bool ContractCompiler::visit(Continue const& _continueStatement)
 
 bool ContractCompiler::visit(Break const& _breakStatement)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _breakStatement);
+	auto locationSetter = m_context.scopedLocation(_breakStatement);
 	solAssert(!m_breakTags.empty(), "");
 	CompilerUtils(m_context).popAndJump(m_breakTags.back().second, m_breakTags.back().first);
 	return false;
@@ -856,7 +856,7 @@ bool ContractCompiler::visit(Break const& _breakStatement)
 
 bool ContractCompiler::visit(Return const& _return)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _return);
+	auto locationSetter = m_context.scopedLocation(_return);
 	if (Expression const* expression = _return.expression())
 	{
 		solAssert(_return.annotation().functionReturnParameters, "Invalid return parameters pointer.");
@@ -889,7 +889,7 @@ bool ContractCompiler::visit(Throw const&)
 
 bool ContractCompiler::visit(EmitStatement const& _emit)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _emit);
+	auto locationSetter = m_context.scopedLocation(_emit);
 	StackHeightChecker checker(m_context);
 	compileExpression(_emit.eventCall());
 	checker.check();
@@ -898,7 +898,7 @@ bool ContractCompiler::visit(EmitStatement const& _emit)
 
 bool ContractCompiler::visit(VariableDeclarationStatement const& _variableDeclarationStatement)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _variableDeclarationStatement);
+	auto locationSetter = m_context.scopedLocation(_variableDeclarationStatement);
 
 	// Local variable slots are reserved when their declaration is visited,
 	// and freed in the end of their scope.
@@ -938,7 +938,7 @@ bool ContractCompiler::visit(VariableDeclarationStatement const& _variableDeclar
 bool ContractCompiler::visit(ExpressionStatement const& _expressionStatement)
 {
 	StackHeightChecker checker(m_context);
-	CompilerContext::LocationSetter locationSetter(m_context, _expressionStatement);
+	auto locationSetter = m_context.scopedLocation(_expressionStatement);
 	Expression const& expression = _expressionStatement.expression();
 	compileExpression(expression);
 	CompilerUtils(m_context).popStackElement(*expression.annotation().type);
@@ -949,7 +949,7 @@ bool ContractCompiler::visit(ExpressionStatement const& _expressionStatement)
 bool ContractCompiler::visit(PlaceholderStatement const& _placeholderStatement)
 {
 	StackHeightChecker checker(m_context);
-	CompilerContext::LocationSetter locationSetter(m_context, _placeholderStatement);
+	auto locationSetter = m_context.scopedLocation(_placeholderStatement);
 	appendModifierOrFunctionCode();
 	checker.check();
 	return true;
@@ -1014,7 +1014,7 @@ void ContractCompiler::appendModifierOrFunctionCode()
 				*modifierInvocation->name()->annotation().referencedDeclaration
 			);
 			ModifierDefinition const& modifier = m_context.resolveVirtualFunctionModifier(nonVirtualModifier);
-			CompilerContext::LocationSetter locationSetter(m_context, modifier);
+			auto locationSetter = m_context.scopedLocation(modifier);
 			std::vector<ASTPointer<Expression>> const& modifierArguments =
 				modifierInvocation->arguments() ? *modifierInvocation->arguments() : std::vector<ASTPointer<Expression>>();
 
@@ -1052,7 +1052,7 @@ void ContractCompiler::appendModifierOrFunctionCode()
 
 void ContractCompiler::appendStackVariableInitialisation(VariableDeclaration const& _variable)
 {
-	CompilerContext::LocationSetter location(m_context, _variable);
+	auto locationSetter = m_context.scopedLocation(_variable);
 	m_context.addVariable(_variable);
 	CompilerUtils(m_context).pushZeroValue(*_variable.annotation().type);
 }

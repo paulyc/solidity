@@ -114,7 +114,7 @@ Statement ASTCopier::operator()(FunctionDefinition const& _function)
 	YulString translatedName = translateIdentifier(_function.name);
 
 	enterFunction(_function);
-	ScopeGuard g([&]() { this->leaveFunction(_function); });
+	auto g = atScopeExit([&]() { this->leaveFunction(_function); });
 
 	return FunctionDefinition{
 		_function.location,
@@ -128,7 +128,7 @@ Statement ASTCopier::operator()(FunctionDefinition const& _function)
 Statement ASTCopier::operator()(ForLoop const& _forLoop)
 {
 	enterScope(_forLoop.pre);
-	ScopeGuard g([&]() { this->leaveScope(_forLoop.pre); });
+	auto g = atScopeExit([&]() { this->leaveScope(_forLoop.pre); });
 
 	return ForLoop{
 		_forLoop.location,
@@ -157,7 +157,7 @@ Statement ASTCopier::translate(Statement const& _statement)
 Block ASTCopier::translate(Block const& _block)
 {
 	enterScope(_block);
-	ScopeGuard g([&]() { this->leaveScope(_block); });
+	auto g = atScopeExit([&]() { this->leaveScope(_block); });
 
 	return Block{_block.location, translateVector(_block.statements)};
 }

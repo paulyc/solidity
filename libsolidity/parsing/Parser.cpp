@@ -705,7 +705,7 @@ ASTPointer<VariableDeclaration> Parser::parseVariableDeclaration(
 ASTPointer<ModifierDefinition> Parser::parseModifierDefinition()
 {
 	RecursionGuard recursionGuard(*this);
-	ScopeGuard resetModifierFlag([this]() { m_insideModifier = false; });
+	auto resetModifierFlag = atScopeExit([this]() { m_insideModifier = false; });
 	m_insideModifier = true;
 
 	ASTNodeFactory nodeFactory(*this);

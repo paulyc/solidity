@@ -253,14 +253,13 @@ public:
 	eth::LinkerObject const& assembledRuntimeObject(size_t _subIndex) const { return m_asm->sub(_subIndex).assemble(); }
 
 	/**
-	 * Helper class to pop the visited nodes stack when a scope closes
+	 * Helper to push and then pop visited nodes upon scope exit.
 	 */
-	class LocationSetter: public ScopeGuard
+	auto scopedLocation(ASTNode const& _node)
 	{
-	public:
-		LocationSetter(CompilerContext& _compilerContext, ASTNode const& _node):
-			ScopeGuard([&]{ _compilerContext.popVisitedNodes(); }) { _compilerContext.pushVisitedNodes(&_node); }
-	};
+		pushVisitedNodes(&_node);
+		return atScopeExit([this]() mutable { popVisitedNodes(); });
+	}
 
 private:
 	/// Searches the inheritance hierarchy towards the base starting from @a _searchStart and returns

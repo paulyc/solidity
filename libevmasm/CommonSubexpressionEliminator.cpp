@@ -41,7 +41,7 @@ vector<AssemblyItem> CommonSubexpressionEliminator::getOptimizedItems()
 		nextInitialState.feedItem(*m_breakingItem);
 	KnownState nextState = nextInitialState;
 
-	ScopeGuard reset([&]()
+	auto reset = atScopeExit([&]()
 	{
 		m_breakingItem = nullptr;
 		m_storeOperations.clear();

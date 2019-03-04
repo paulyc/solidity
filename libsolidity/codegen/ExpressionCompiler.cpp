@@ -56,7 +56,7 @@ void ExpressionCompiler::appendStateVariableInitialization(VariableDeclaration c
 		return;
 	TypePointer type = _varDecl.value()->annotation().type;
 	solAssert(!!type, "Type information not available.");
-	CompilerContext::LocationSetter locationSetter(m_context, _varDecl);
+	auto locationSetter = m_context.scopedLocation(_varDecl);
 	_varDecl.value()->accept(*this);
 
 	if (_varDecl.annotation().type->dataStoredIn(DataLocation::Storage))
@@ -89,7 +89,7 @@ void ExpressionCompiler::appendConstStateVariableAccessor(VariableDeclaration co
 void ExpressionCompiler::appendStateVariableAccessor(VariableDeclaration const& _varDecl)
 {
 	solAssert(!_varDecl.isConstant(), "");
-	CompilerContext::LocationSetter locationSetter(m_context, _varDecl);
+	auto locationSetter = m_context.scopedLocation(_varDecl);
 	FunctionType accessorType(_varDecl);
 
 	TypePointers paramTypes = accessorType.parameterTypes();
@@ -222,7 +222,7 @@ void ExpressionCompiler::appendStateVariableAccessor(VariableDeclaration const& 
 
 bool ExpressionCompiler::visit(Conditional const& _condition)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _condition);
+	auto locationSetter = m_context.scopedLocation(_condition);
 	_condition.condition().accept(*this);
 	eth::AssemblyItem trueTag = m_context.appendConditionalJump();
 	_condition.falseExpression().accept(*this);
@@ -239,7 +239,7 @@ bool ExpressionCompiler::visit(Conditional const& _condition)
 
 bool ExpressionCompiler::visit(Assignment const& _assignment)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _assignment);
+	auto locationSetter = m_context.scopedLocation(_assignment);
 	Token op = _assignment.assignmentOperator();
 	Token binOp = op == Token::Assign ? op : TokenTraits::AssignmentToBinaryOp(op);
 	Type const& leftType = *_assignment.leftHandSide().annotation().type;
@@ -358,7 +358,7 @@ bool ExpressionCompiler::visit(TupleExpression const& _tuple)
 
 bool ExpressionCompiler::visit(UnaryOperation const& _unaryOperation)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _unaryOperation);
+	auto locationSetter = m_context.scopedLocation(_unaryOperation);
 	if (_unaryOperation.annotation().type->category() == Type::Category::RationalNumber)
 	{
 		m_context << _unaryOperation.annotation().type->literalValue(nullptr);
@@ -425,7 +425,7 @@ bool ExpressionCompiler::visit(UnaryOperation const& _unaryOperation)
 
 bool ExpressionCompiler::visit(BinaryOperation const& _binaryOperation)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _binaryOperation);
+	auto locationSetter = m_context.scopedLocation(_binaryOperation);
 	Expression const& leftExpression = _binaryOperation.leftExpression();
 	Expression const& rightExpression = _binaryOperation.rightExpression();
 	solAssert(!!_binaryOperation.annotation().commonType, "");
@@ -479,7 +479,7 @@ bool ExpressionCompiler::visit(BinaryOperation const& _binaryOperation)
 
 bool ExpressionCompiler::visit(FunctionCall const& _functionCall)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _functionCall);
+	auto locationSetter = m_context.scopedLocation(_functionCall);
 	if (_functionCall.annotation().kind == FunctionCallKind::TypeConversion)
 	{
 		solAssert(_functionCall.arguments().size() == 1, "");
@@ -568,7 +568,7 @@ bool ExpressionCompiler::visit(FunctionCall const& _functionCall)
 					{
 						// Do not directly visit the identifier, because this way, we can avoid
 						// the runtime entry label to be created at the creation time context.
-						CompilerContext::LocationSetter locationSetter2(m_context, *identifier);
+						auto locationSetter2 = m_context.scopedLocation(*identifier);
 						utils().pushCombinedFunctionEntryLabel(m_context.resolveVirtualFunction(*functionDef), false);
 						shortcutTaken = true;
 					}
@@ -1145,7 +1145,7 @@ bool ExpressionCompiler::visit(NewExpression const&)
 
 bool ExpressionCompiler::visit(MemberAccess const& _memberAccess)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _memberAccess);
+	auto locationSetter = m_context.scopedLocation(_memberAccess);
 	// Check whether the member is a bound function.
 	ASTString const& member = _memberAccess.memberName();
 	if (auto funType = dynamic_cast<FunctionType const*>(_memberAccess.annotation().type.get()))
@@ -1509,7 +1509,7 @@ bool ExpressionCompiler::visit(MemberAccess const& _memberAccess)
 
 bool ExpressionCompiler::visit(IndexAccess const& _indexAccess)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _indexAccess);
+	auto locationSetter = m_context.scopedLocation(_indexAccess);
 	_indexAccess.baseExpression().accept(*this);
 
 	Type const& baseType = *_indexAccess.baseExpression().annotation().type;
@@ -1613,7 +1613,7 @@ bool ExpressionCompiler::visit(IndexAccess const& _indexAccess)
 
 void ExpressionCompiler::endVisit(Identifier const& _identifier)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _identifier);
+	auto locationSetter = m_context.scopedLocation(_identifier);
 	Declaration const* declaration = _identifier.annotation().referencedDeclaration;
 	if (MagicVariableDeclaration const* magicVar = dynamic_cast<MagicVariableDeclaration const*>(declaration))
 	{
@@ -1665,7 +1665,7 @@ void ExpressionCompiler::endVisit(Identifier const& _identifier)
 
 void ExpressionCompiler::endVisit(Literal const& _literal)
 {
-	CompilerContext::LocationSetter locationSetter(m_context, _literal);
+	auto locationSetter = m_context.scopedLocation(_literal);
 	TypePointer type = _literal.annotation().type;
 
 	switch (type->category())
